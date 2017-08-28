@@ -8,7 +8,7 @@ import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.DecisionTree
-import org.apache.spark.mllib.tree.model.DecisionTreeModel
+import org.apache.spark.mllib.tree.model.{DecisionTreeModel, Node}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -35,19 +35,21 @@ object RandomForest {
     testData.cache()
     val model = DecisionTree.trainClassifier(trainData, numClasses, Map[Int, Int](), impurity, maxDepth, maxBins)
     //本地模式删除已存在模型
-    if (conf.get("spark.master")=="local") {
-      val file = new File(modelResultPath)
-      if (file.exists()) file.delete()
+    if (!modelResultPath.isEmpty) {
+      if (conf.get("spark.master") == "local") {
+        val file = new File(modelResultPath)
+        if (file.exists()) file.delete()
+      }
+      //集群模式删除已存在模型
+      val hadoopConf = sc.hadoopConfiguration
+      val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
+      val path = new Path(modelResultPath)
+      if (hdfs.exists(path)) {
+        hdfs.delete(path, true)
+      }
+      //保存模型
+        model.save(sc, modelResultPath)
     }
-    //集群模式删除已存在模型
-    val hadoopConf = sc.hadoopConfiguration
-    val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
-    val path = new Path(modelResultPath)
-    if (hdfs.exists(path)){
-      hdfs.delete(path,true)
-    }
-    //保存模型
-    //model.save(sc,modelResultPath)
     val metrics = getMetrics(model, cvData)//用cv集生成度量
     val accuracy = metrics.accuracy//度量在cv集上的总精确度
 

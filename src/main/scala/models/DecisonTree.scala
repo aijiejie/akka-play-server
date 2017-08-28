@@ -2,13 +2,14 @@ package models
 
 import java.io.File
 
+import actors.RFTaskResult
 import org.apache.hadoop.fs.Path
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.DecisionTree
-import org.apache.spark.mllib.tree.model.DecisionTreeModel
+import org.apache.spark.mllib.tree.model.{DecisionTreeModel, Node}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -16,8 +17,8 @@ object DecisonTree {
 
   Logger.getLogger("org").setLevel(Level.ERROR)
 
-  def decisonTree(dtTrainDataPath: String,dataPath:String, name: String, delimiter: String, numClasses: Int, modelResultPath:String,
-                  resultPath:String, impurity: String, maxDepth: Int, maxBins: Int): Double = {
+  def decisonTree(dtTrainDataPath: String, dataPath: String, name: String, delimiter: String, numClasses: Int, modelResultPath: String,
+                  resultPath: String, impurity: String, maxDepth: Int, maxBins: Int): String = {
     //val conf = new SparkConf().setAppName("ALS").setMaster("spark://master:7077")//集群模式
     //val conf = new SparkConf().setAppName("ALS").setMaster("yarn-client")//yarn模式
     val conf = new SparkConf().setAppName("DecisonTree-" + name).setMaster("local")//本地模式
@@ -35,42 +36,106 @@ object DecisonTree {
     testData.cache()
     val model = DecisionTree.trainClassifier(trainData, numClasses, Map[Int, Int](), impurity, maxDepth, maxBins)
     //本地模式删除已存在模型
-    if (conf.get("spark.master")=="local") {
-      val file = new File(modelResultPath)
-      if (file.exists()) file.delete()
+    if (!modelResultPath.isEmpty) {
+      if (conf.get("spark.master") == "local") {
+        val file = new File(modelResultPath)
+        if (file.exists()) file.delete()
+      }
+      //集群模式删除已存在模型
+      val hadoopConf = sc.hadoopConfiguration
+      val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
+      val path = new Path(modelResultPath)
+      hdfs.delete(path, true)
+      //保存模型
+        model.save(sc, modelResultPath)
     }
-    //集群模式删除已存在模型
-    val hadoopConf = sc.hadoopConfiguration
-    val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
-    val path = new Path(modelResultPath)
-    if (hdfs.exists(path)){
-      hdfs.delete(path,true)
-    }
-    //保存模型
-    //model.save(sc,modelResultPath)
-    val metrics = getMetrics(model, cvData)//用cv集生成度量
-    val accuracy = metrics.accuracy//度量在cv集上的总精确度
+    val metrics = getMetrics(model, cvData)
+    //用cv集生成度量
+    val accuracy = metrics.accuracy //度量在cv集上的总精确度
+    val result = accuracy.toString
 
     /*预测*/
-    if (!dataPath.isEmpty){
-      val predictData = sc.textFile(dataPath).map{ line =>
+    if (!dataPath.isEmpty) {
+      val predictData = sc.textFile(dataPath).map { line =>
         val values = line.split(delimiter).map(_.toDouble)
         val featureVector = Vectors.dense(values.init)
-         featureVector
+        featureVector
       }
       model.predict(predictData).saveAsTextFile(resultPath)
     }
     sc.stop()
-    accuracy
+    result
   }
 
-  def getMetrics(model: DecisionTreeModel, data: RDD[LabeledPoint]): MulticlassMetrics = {//用cv集产生度量
+  def getMetrics(model: DecisionTreeModel, data: RDD[LabeledPoint]): MulticlassMetrics = {
+    //用cv集产生度量
     val predictionsAndLabels = data.map { example =>
       (model.predict(example.features), example.label)
     }
     new MulticlassMetrics(predictionsAndLabels)
   }
 
+  /**
+    * 打印决策树
+    * 目前无法将打印的字符串发送，因为打印后的字符串超过akka大小限制，应该尝试用akka stream解决
+    *
+    * @param model
+    * @return
+    */
+  def printDecisionTree(model: DecisionTreeModel): String = {
+    model.toString() + "\n" +
+      printTree(model.topNode)
+  }
 
+  def printTree(root: Node): String = {
+    val right: String = if (root.rightNode != None) {
+      printTree(root.rightNode.get, true, "")
+    } else {
+      ""
+    }
+
+    val rootStr = printNodeValue(root)
+    val left: String = if (root.leftNode != None) {
+      printTree(root.leftNode.get, false, "")
+    } else {
+      ""
+    }
+    right + rootStr + left
+  }
+
+  def printNodeValue(root: Node): String = {
+    val rootStr: String = if (root.split == None) {
+      if (root.isLeaf) {
+        root.predict.toString()
+      } else {
+        ""
+      }
+    } else {
+      "Feature:" + root.split.get.feature + " > " + root.split.get.threshold
+    }
+    rootStr + "\n"
+  }
+
+  def printTree(root: Node, isRight: Boolean, indent: String): String = {
+    val right: String = if (root.rightNode != None) {
+      printTree(root.rightNode.get, true, indent + (if (isRight) "        " else " |      "))
+    } else {
+      ""
+    }
+    //    indent
+    val right2 = if (isRight) {
+      " /"
+    } else {
+      " \\"
+    }
+    val tmp = "----- "
+    val rootStr = printNodeValue(root)
+    val left: String = if (root.leftNode != None) {
+      printTree(root.leftNode.get, false, indent + (if (isRight) " |      " else "        "))
+    } else {
+      ""
+    }
+    right + indent + right2 + tmp + rootStr + left
+  }
 
 }

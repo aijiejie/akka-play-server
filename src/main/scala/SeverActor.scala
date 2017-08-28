@@ -21,7 +21,7 @@ class SeverActor() extends Actor {
     }
 
     case "stop" => context.system.terminate()
-
+    //测试响应
     case ClientSubmitTask(dataPath, name) => {
       sender() ! "收到测试任务"
       val result = SeverActor.run(dataPath, name)
@@ -44,7 +44,7 @@ class SeverActor() extends Actor {
       sender() ! "收到决策树任务"
       /*下面的函数调用以后要改用子actor实现，与主actor隔离，并实行监控，一旦spark任务出错，可以想办法用父actor来结束子actor的spark任务*/
       val result = DecisonTree.decisonTree(dtTrainDataPath, dataPath, name, delimiter, numClasses, modelResultPath, resultPath, impurity, maxDepth, maxBins)
-      sender() ! DTTaskResult(modelResultPath, result.toString, resultPath)
+      sender() ! DTTaskResult(modelResultPath, result, resultPath)
     }
 
     case RFTask(masterHost, masterPort, rfTrainData,predictData, modelResult,presictResult,
@@ -93,8 +93,8 @@ object SeverActor {
   }
 /*ALS模块*/
   def Als(dataPath: String, name: String, dataResultPath: String, alsResultNumber: Int, rank: Int, numIterations: Int, delimiter: String): Boolean = {
-    //val conf = new SparkConf().setAppName("ALS").setMaster("spark://master:7077")
-    val conf = new SparkConf().setAppName("ALS").setMaster("yarn-client")
+    val conf = new SparkConf().setAppName("ALS").setMaster("spark://master:7077")
+    //val conf = new SparkConf().setAppName("ALS").setMaster("yarn-client")
     //val conf = new SparkConf().setAppName("ALS" + name).setMaster("local")
     val sc = new SparkContext(conf)
     val data = sc.textFile(dataPath)
