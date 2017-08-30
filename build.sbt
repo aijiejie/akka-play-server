@@ -1,6 +1,6 @@
 name := "serverActor"
 
-version := "2.3"
+version := "2.4"
 
 scalaVersion := "2.11.3"
 
