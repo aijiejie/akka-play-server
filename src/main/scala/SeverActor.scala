@@ -1,7 +1,7 @@
 import actors._
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import models.{DecisonTree, RandomForest}
+import models.{DecisonTree, RandomForest, SVM}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.recommendation._
@@ -49,9 +49,18 @@ class SeverActor() extends Actor {
 
     case RFTask(masterHost, masterPort, rfTrainData,predictData, modelResult,presictResult,
     numClasses,numTrees ,name,featureSubsetStrategy, impurity, maxDepth,maxBins ,delimiter) => {
-      sender() ! "收到随机森林任务"//写到这里！！！！
+      sender() ! "收到随机森林任务"
       val result = RandomForest.randomForest(rfTrainData, predictData, name,featureSubsetStrategy, delimiter, numClasses,numTrees, modelResult, presictResult, impurity, maxDepth, maxBins)
       sender() ! RFTaskResult(modelResult,result.toString,presictResult)
+    }
+    case SvmTask(svmMasterHost,svmMasterPort,svmTrainDataPath,
+    svmPredictDataPath,svmModelResultPath,svmPredictResultPath,
+    name,iter) =>{
+      sender() ! "收到SVM任务 "
+      val result =SVM.svm(svmMasterHost,svmMasterPort,svmTrainDataPath,
+        svmPredictDataPath,svmModelResultPath,svmPredictResultPath,
+        name,iter)
+      sender() ! SvmTaskResult(result,svmModelResultPath,svmPredictResultPath)
     }
   }
 }
