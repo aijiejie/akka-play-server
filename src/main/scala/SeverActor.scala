@@ -1,7 +1,7 @@
 import actors._
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import models.{DecisonTree, LR, RandomForest, SVM}
+import models.{DecisonTree, LR, RandomForest, SVM,DecisionTreeRegression}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.recommendation._
@@ -72,6 +72,15 @@ class SeverActor() extends Actor {
         lrPredictDataPath,lrModelResultPath,lrPredictResultPath,
         name,iter)
       sender() ! LRTaskResult(result,lrModelResultPath,lrPredictResultPath)
+    }
+    //决策树回归应答
+    case DTRTask(masterHost, masterPort, dtTrainData, predictData, modelResult, result
+    , name, impurity, maxDepth, maxBins) => {
+      sender() ! "收到决策树回归任务"
+      /*下面的函数调用以后要改用子actor实现，与主actor隔离，并实行监控，一旦spark任务出错，可以想办法用父actor来结束子actor的spark任务*/
+      val testMSE = DecisionTreeRegression.decisionTreeRegression(masterHost, masterPort, dtTrainData, predictData, modelResult, result
+        , name, impurity, maxDepth, maxBins)
+      sender() ! DTRTaskResult(modelResult, testMSE.toString, result)
     }
   }
 }

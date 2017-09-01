@@ -19,9 +19,9 @@ object DecisonTree {
 
   def decisonTree(dtTrainDataPath: String, dataPath: String, name: String, delimiter: String, numClasses: Int, modelResultPath: String,
                   resultPath: String, impurity: String, maxDepth: Int, maxBins: Int): String = {
-    //val conf = new SparkConf().setAppName("ALS").setMaster("spark://master:7077")//集群模式
-    //val conf = new SparkConf().setAppName("ALS").setMaster("yarn-client")//yarn模式
-    val conf = new SparkConf().setAppName("DecisonTree-" + name).setMaster("local")//本地模式
+    //val conf = new SparkConf().setAppName("DecisionTree-" + name).setMaster("spark://master:7077")//集群模式
+    //val conf = new SparkConf().setAppName("DecisionTree-" + name).setMaster("yarn-client")//yarn模式
+    val conf = new SparkConf().setAppName("DecisionTree-" + name).setMaster("local")//本地模式
     val sc = new SparkContext(conf)
     val rawData = sc.textFile(dtTrainDataPath)
     val data = rawData.map { line =>
