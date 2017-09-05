@@ -1,7 +1,7 @@
 import actors._
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import com.typesafe.config.ConfigFactory
-import models.{DecisonTree, LR, RandomForest, SVM,DecisionTreeRegression}
+import models._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.recommendation._
@@ -19,7 +19,7 @@ class SeverActor() extends Actor {
       println("have client")
       sender() ! "connect ok"
     }
-
+    //停止命令
     case "stop" => context.system.terminate()
     //测试响应
     case ClientSubmitTask(dataPath, name) => {
@@ -81,6 +81,16 @@ class SeverActor() extends Actor {
       val testMSE = DecisionTreeRegression.decisionTreeRegression(masterHost, masterPort, dtTrainData, predictData, modelResult, result
         , name, impurity, maxDepth, maxBins)
       sender() ! DTRTaskResult(modelResult, testMSE.toString, result)
+    }
+      //线性回归应答
+    case LinerRegressionTask(linerRMasterHost, linerRMasterPort, linerRTrainDataPath,
+    linerRPredictDataPath, linerRModelResultPath, linerRPredictResultPath,
+    linerRname, iter,delimiter,stepSize) =>{
+      sender() ! "收到线性回归任务"
+      val mse = LinerRegression.LinerRegression(linerRMasterHost, linerRMasterPort, linerRTrainDataPath,
+        linerRPredictDataPath, linerRModelResultPath, linerRPredictResultPath,
+        linerRname, iter,delimiter,stepSize)
+      sender() ! LinerRegressionTaskResult(mse,linerRModelResultPath,linerRPredictResultPath)
     }
   }
 }
