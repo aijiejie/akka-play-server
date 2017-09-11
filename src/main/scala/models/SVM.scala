@@ -18,7 +18,7 @@ object SVM {
   def svm(svmMasterHost:String,svmMasterPort:String,svmTrainDataPath:String,
           svmPredictDataPath:String,svmModelResultPath:String,svmPredictResultPath:String,
           name:String,iter:Int) = {
-    //val conf = new SparkConf().setAppName("SVM-" + name).setMaster("spark://master:7077")//集群模式
+    //val conf = new SparkConf().setAppName("SVM-" + name).setMaster("spark://master:7077")//.setJars(Seq("/home/hadoop/spark-app/app-jar/play/serverActor-assembly-2.6.jar"))//集群模式
     //val conf = new SparkConf().setAppName("SVM-" + name).setMaster("yarn-client")//yarn模式
     val conf = new SparkConf().setAppName("SVM-" + name).setMaster("local")//本地模式
     val sc = new SparkContext(conf)

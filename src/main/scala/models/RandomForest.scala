@@ -18,7 +18,7 @@ object RandomForest {
 
   def randomForest(dtTrainDataPath: String,dataPath:String, name: String,featureSubsetStrategy:String, delimiter: String, numClasses: Int,numTrees:Int, modelResultPath:String,
                   resultPath:String, impurity: String, maxDepth: Int, maxBins: Int): Double = {
-    //val conf = new SparkConf().setAppName("RandomForest-" + name).setMaster("spark://master:7077")//集群模式
+    //val conf = new SparkConf().setAppName("RandomForest-" + name).setMaster("spark://master:7077")//.setJars(Seq("/home/hadoop/spark-app/app-jar/play/serverActor-assembly-2.6.jar"))//集群模式
     //val conf = new SparkConf().setAppName("RandomForest-" + name).setMaster("yarn-client")//yarn模式
     val conf = new SparkConf().setAppName("RandomForest-" + name).setMaster("local")//本地模式
     val sc = new SparkContext(conf)

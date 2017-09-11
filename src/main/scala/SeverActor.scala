@@ -14,6 +14,8 @@ import scala.concurrent.duration._
 class SeverActor() extends Actor {
   Logger.getLogger("org").setLevel(Level.ERROR)
 
+  /*下面的函数调用以后要改用子actor实现，与主actor隔离实现并行，并实行监控，
+  一旦spark任务出错，可以想办法用父actor来结束子actor的spark任务*/
   override def receive: Receive = {
     case "connect" => {
       println("have client")
@@ -21,7 +23,7 @@ class SeverActor() extends Actor {
     }
     //停止命令
     case "stop" => context.system.terminate()
-    //测试响应
+    //测试任务
     case ClientSubmitTask(dataPath, name) => {
       sender() ! "收到测试任务"
       val result = SeverActor.run(dataPath, name)
@@ -32,17 +34,15 @@ class SeverActor() extends Actor {
       println("无效命令")
     }
 
-    //Als应答
+    //Als任务
     case AlsTask(masterHost, masterPort, datapath, dataResultPath, alsRseultNumber, name, rank, iter, delimiter) => {
       sender() ! "收到ALS算法任务"
-      /*下面的函数调用以后要改用子actor实现，与主actor隔离，并实行监控，一旦spark任务出错，可以想办法用父actor来结束子actor的spark任务*/
-      val result = SeverActor.Als(datapath, name, dataResultPath, alsRseultNumber, rank, iter, delimiter)
+      val result = Als.als(datapath, name, dataResultPath, alsRseultNumber, rank, iter, delimiter)
       if (result) sender() ! "ALS推荐算法任务成功结束"
     }
-      //决策树应答
+      //决策树任务
     case DTTask(masterHost, masterPort,dtTrainDataPath, dataPath, modelResultPath, resultPath,numClasses, name, impurity, maxDepth,maxBins ,delimiter) => {
       sender() ! "收到决策树任务"
-      /*下面的函数调用以后要改用子actor实现，与主actor隔离，并实行监控，一旦spark任务出错，可以想办法用父actor来结束子actor的spark任务*/
       val result = DecisonTree.decisonTree(dtTrainDataPath, dataPath, name, delimiter, numClasses, modelResultPath, resultPath, impurity, maxDepth, maxBins)
       sender() ! DTTaskResult(modelResultPath, result, resultPath)
     }
@@ -73,7 +73,7 @@ class SeverActor() extends Actor {
         name,iter)
       sender() ! LRTaskResult(result,lrModelResultPath,lrPredictResultPath)
     }
-    //决策树回归应答
+    //决策树回归任务
     case DTRTask(masterHost, masterPort, dtTrainData, predictData, modelResult, result
     , name, impurity, maxDepth, maxBins) => {
       sender() ! "收到决策树回归任务"
@@ -82,7 +82,7 @@ class SeverActor() extends Actor {
         , name, impurity, maxDepth, maxBins)
       sender() ! DTRTaskResult(modelResult, testMSE.toString, result)
     }
-      //线性回归应答
+      //线性回归任务
     case LinerRegressionTask(linerRMasterHost, linerRMasterPort, linerRTrainDataPath,
     linerRPredictDataPath, linerRModelResultPath, linerRPredictResultPath,
     linerRname, iter,delimiter,stepSize) =>{
@@ -130,36 +130,7 @@ object SeverActor {
     sc.stop()
     "Lines with -: %s, Lines with +: %s".format(numAs, numBs)
   }
-/*ALS模块*/
-  def Als(dataPath: String, name: String, dataResultPath: String, alsResultNumber: Int, rank: Int, numIterations: Int, delimiter: String): Boolean = {
-    val conf = new SparkConf().setAppName("ALS").setMaster("spark://master:7077")
-    //val conf = new SparkConf().setAppName("ALS").setMaster("yarn-client")
-    //val conf = new SparkConf().setAppName("ALS" + name).setMaster("local")
-    val sc = new SparkContext(conf)
-    val data = sc.textFile(dataPath)
-    val ratings = data.map(_.split(delimiter) match { //处理数据
-      case Array(user, item, rate) => //将数据集转化
-        Rating(user.toInt, item.toInt, rate.toDouble)
-    }) //将数据集转化为专用Rating
-    val model = ALS.train(ratings, rank, numIterations, 0.01) //进行模型训练
-    //model.save(sc, "myAls") //保存模型
-    val allRs = model.recommendProductsForUsers(alsResultNumber). //为所有用户推荐n个商品
-      map {
-      case (userID, recommendations) => {
-        var recommendationStr = ""
-        for (r <- recommendations) {
-          recommendationStr += "产品" + r.product + "评分:" + r.rating + ","
-        }
-        if (recommendationStr.endsWith(","))
-          recommendationStr = recommendationStr.substring(0, recommendationStr.length - 1)
 
-        ("用户" + userID, "推荐：" + recommendationStr)
-      }
-    }
-    allRs.coalesce(1).sortByKey().saveAsTextFile(dataResultPath)
-    sc.stop()
-    true
-  }
 
 
 }
