@@ -13,17 +13,18 @@ import org.apache.spark.mllib.tree.DecisionTree
 import org.apache.spark.mllib.tree.model.{DecisionTreeModel, Node}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
+import actors.SeverActor._
 
 object DecisonTree {
 
   Logger.getLogger("org").setLevel(Level.ERROR)
-
   def decisonTree(dtTrainDataPath: String, dataPath: String, name: String, delimiter: String, numClasses: Int, modelResultPath: String,
                   resultPath: String, impurity: String, maxDepth: Int, maxBins: Int): String = {
     //val conf = new SparkConf().setAppName("DecisionTree-" + name).setMaster("spark://master:7077")//.setJars(Seq("/home/hadoop/spark-app/app-jar/play/serverActor-assembly-2.6.jar"))//集群模式
     //val conf = new SparkConf().setAppName("DecisionTree-" + name).setMaster("yarn-client")//yarn模式
-    val conf = new SparkConf().setAppName("DecisionTree-" + name).setMaster("local")//本地模式
-    val sc = new SparkContext(conf)
+    //val conf = new SparkConf().setAppName("DecisionTree-" + name).setMaster("local")//本地模式
+    conf.setAppName(name)
+    //val sc = new SparkContext(conf)
     val rawData = sc.textFile(dtTrainDataPath)
     val data = rawData.map { line =>
       val values = line.split(delimiter).map(_.toDouble)
@@ -68,7 +69,7 @@ object DecisonTree {
       }
       model.predict(predictData).saveAsTextFile(resultPath)
     }
-    sc.stop()
+    //sc.stop()
     result
   }
 
