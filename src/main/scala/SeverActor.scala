@@ -1,6 +1,6 @@
 import actors._
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import models._
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.mllib.linalg.Vectors
@@ -17,15 +17,15 @@ class SeverActor() extends Actor {
   override def receive: Receive = {
     case "connect" => {
       println("have client")
-      sender() ! "connect ok"
+      sender ! "connect ok"
     }
     //停止命令
-    case "stop" => context.system.terminate()
+    case "stop" => context.system.shutdown()
     //测试响应
     case ClientSubmitTask(dataPath, name) => {
-      sender() ! "收到测试任务"
+      sender ! "收到测试任务"
       val result = SeverActor.run(dataPath, name)
-      sender() ! TestResult(result)
+      sender ! TestResult(result)
     }
 
     case _: String => {
@@ -34,63 +34,63 @@ class SeverActor() extends Actor {
 
     //Als应答
     case AlsTask(masterHost, masterPort, datapath, dataResultPath, alsRseultNumber, name, rank, iter, delimiter) => {
-      sender() ! "收到ALS算法任务"
+      sender ! "收到ALS算法任务"
       /*下面的函数调用以后要改用子actor实现，与主actor隔离，并实行监控，一旦spark任务出错，可以想办法用父actor来结束子actor的spark任务*/
       val result = SeverActor.Als(datapath, name, dataResultPath, alsRseultNumber, rank, iter, delimiter)
-      if (result) sender() ! "ALS推荐算法任务成功结束"
+      if (result) sender ! "ALS推荐算法任务成功结束"
     }
       //决策树应答
     case DTTask(masterHost, masterPort,dtTrainDataPath, dataPath, modelResultPath, resultPath,numClasses, name, impurity, maxDepth,maxBins ,delimiter) => {
-      sender() ! "收到决策树任务"
+      sender ! "收到决策树任务"
       /*下面的函数调用以后要改用子actor实现，与主actor隔离，并实行监控，一旦spark任务出错，可以想办法用父actor来结束子actor的spark任务*/
       val result = DecisonTree.decisonTree(dtTrainDataPath, dataPath, name, delimiter, numClasses, modelResultPath, resultPath, impurity, maxDepth, maxBins)
-      sender() ! DTTaskResult(modelResultPath, result, resultPath)
+      sender ! DTTaskResult(modelResultPath, result, resultPath)
     }
     //随机森林任务
     case RFTask(masterHost, masterPort, rfTrainData,predictData, modelResult,presictResult,
     numClasses,numTrees ,name,featureSubsetStrategy, impurity, maxDepth,maxBins ,delimiter) => {
-      sender() ! "收到随机森林任务"
+      sender ! "收到随机森林任务"
       val result = RandomForest.randomForest(rfTrainData, predictData, name,featureSubsetStrategy, delimiter, numClasses,numTrees, modelResult, presictResult, impurity, maxDepth, maxBins)
-      sender() ! RFTaskResult(modelResult,result.toString,presictResult)
+      sender ! RFTaskResult(modelResult,result.toString,presictResult)
     }
       //SVM任务
     case SvmTask(svmMasterHost,svmMasterPort,svmTrainDataPath,
     svmPredictDataPath,svmModelResultPath,svmPredictResultPath,
     name,iter) =>{
-      sender() ! "收到SVM任务"
+      sender ! "收到SVM任务"
       val result =SVM.svm(svmMasterHost,svmMasterPort,svmTrainDataPath,
         svmPredictDataPath,svmModelResultPath,svmPredictResultPath,
         name,iter)
-      sender() ! SvmTaskResult(result,svmModelResultPath,svmPredictResultPath)
+      sender ! SvmTaskResult(result,svmModelResultPath,svmPredictResultPath)
     }
       //LR任务
     case LRTask(lrMasterHost,lrMasterPort,lrTrainDataPath,
     lrPredictDataPath,lrModelResultPath,lrPredictResultPath,
     name,iter) =>{
-      sender() ! "收到LR任务"
+      sender ! "收到LR任务"
       val result = LR.lr(lrMasterHost,lrMasterPort,lrTrainDataPath,
         lrPredictDataPath,lrModelResultPath,lrPredictResultPath,
         name,iter)
-      sender() ! LRTaskResult(result,lrModelResultPath,lrPredictResultPath)
+      sender ! LRTaskResult(result,lrModelResultPath,lrPredictResultPath)
     }
     //决策树回归应答
     case DTRTask(masterHost, masterPort, dtTrainData, predictData, modelResult, result
     , name, impurity, maxDepth, maxBins) => {
-      sender() ! "收到决策树回归任务"
+      sender ! "收到决策树回归任务"
       /*下面的函数调用以后要改用子actor实现，与主actor隔离，并实行监控，一旦spark任务出错，可以想办法用父actor来结束子actor的spark任务*/
       val testMSE = DecisionTreeRegression.decisionTreeRegression(masterHost, masterPort, dtTrainData, predictData, modelResult, result
         , name, impurity, maxDepth, maxBins)
-      sender() ! DTRTaskResult(modelResult, testMSE.toString, result)
+      sender ! DTRTaskResult(modelResult, testMSE.toString, result)
     }
       //线性回归应答
     case LinerRegressionTask(linerRMasterHost, linerRMasterPort, linerRTrainDataPath,
     linerRPredictDataPath, linerRModelResultPath, linerRPredictResultPath,
     linerRname, iter,delimiter,stepSize) =>{
-      sender() ! "收到线性回归任务"
+      sender ! "收到线性回归任务"
       val mse = LinerRegression.LinerRegression(linerRMasterHost, linerRMasterPort, linerRTrainDataPath,
         linerRPredictDataPath, linerRModelResultPath, linerRPredictResultPath,
         linerRname, iter,delimiter,stepSize)
-      sender() ! LinerRegressionTaskResult(mse,linerRModelResultPath,linerRPredictResultPath)
+      sender ! LinerRegressionTaskResult(mse,linerRModelResultPath,linerRPredictResultPath)
     }
   }
 }
@@ -102,18 +102,21 @@ object SeverActor {
 
     val host = args(0)
     val port = args(1)
-    val configStr =
+
+    val configStr:String =
       s"""
          |akka.actor.provider = "akka.remote.RemoteActorRefProvider"
          |akka.remote.netty.tcp.hostname = "$host"
          |akka.remote.netty.tcp.port = "$port"
        """.stripMargin
-    val config = ConfigFactory.parseString(configStr)
-    val actorSystem = ActorSystem("MasterActor", config)
+    val mlconfig = ConfigFactory.parseString(configStr)
+
+    val actorSystem = ActorSystem.create("MasterActor", mlconfig)
     //val supervisor = actorSystem.actorOf(Props[Supervisor],"Supervisor")//监控server测试
     //supervisor ! Props(new SeverActor())
     serverActor = actorSystem.actorOf(Props(new SeverActor()), "Server")
-    Await.ready(actorSystem.whenTerminated, 30.minutes)
+    //Await.ready(actorSystem.whenTerminated, 30.minutes)
+    //actorSystem.awaitTermination(30.minutes)
   }
 
 
