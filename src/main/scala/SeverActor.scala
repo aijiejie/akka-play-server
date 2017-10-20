@@ -103,18 +103,23 @@ object SeverActor {
     val host = args(0)
     val port = args(1)
 
-    val configStr:String =
-      s"""
-         |akka.actor.provider = "akka.remote.RemoteActorRefProvider"
-         |akka.remote.netty.tcp.hostname = "$host"
-         |akka.remote.netty.tcp.port = "$port"
-       """.stripMargin
-    val mlconfig = ConfigFactory.parseString(configStr)
+    val cf=ConfigFactory.load().getConfig("master")
 
-    val actorSystem = ActorSystem.create("MasterActor", mlconfig)
+
+//    val configStr:String =
+//      s"""
+//         |akka.actor.provider = "akka.remote.RemoteActorRefProvider"
+//         |akka.remote.netty.tcp.hostname = "$host"
+//         |akka.remote.netty.tcp.port = "$port"
+//       """.stripMargin
+//    val mlconfig = ConfigFactory.parseString(configStr)
+
+    val actorSystem = ActorSystem.create("MasterActor",cf)//使用master进行序列化
+
     //val supervisor = actorSystem.actorOf(Props[Supervisor],"Supervisor")//监控server测试
     //supervisor ! Props(new SeverActor())
     serverActor = actorSystem.actorOf(Props(new SeverActor()), "Server")
+    print(serverActor.path)
     //Await.ready(actorSystem.whenTerminated, 30.minutes)
     //actorSystem.awaitTermination(30.minutes)
   }

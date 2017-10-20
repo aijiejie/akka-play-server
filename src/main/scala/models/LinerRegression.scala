@@ -20,7 +20,6 @@ object LinerRegression {
     //val conf = new SparkConf().setAppName("LinerRegression-" + linrRName).setMaster("yarn-client")//yarn模式
     val conf = new SparkConf().setAppName("LinerRegression-" + linerRName).setMaster("local")//本地模式
     val sc = new SparkContext(conf)
-
     val data = sc.textFile(linerRTrainDataPath)
     val parsedData = data.map { line =>
       val parts = line.split(delimiter)
