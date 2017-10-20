@@ -16,7 +16,7 @@ class SeverActor() extends Actor {
 
   override def receive: Receive = {
     case "connect" => {
-      println("have client")
+      println("receive task")
       sender ! "connect ok"
     }
     //停止命令
