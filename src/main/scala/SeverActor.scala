@@ -20,7 +20,7 @@ class SeverActor() extends Actor {
       sender ! "connect ok"
     }
     //停止命令
-    case "stop" => context.system.shutdown()
+    case "stop" => context.system.terminate()
     //测试响应
     case ClientSubmitTask(dataPath, name) => {
       sender ! "收到测试任务"
